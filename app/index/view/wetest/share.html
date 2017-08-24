@@ -5,6 +5,7 @@
 	<meta name="viewpoint" content="initial-scale=1.0;width=device-width" charset="utf-8"/>
 	<meta http-equiv="content" content="text/html;charset=utf-8"/>
 	<script type="text/javascript" src="http://res.wx.qq.com/open/js/jweixin-1.2.0.js"></script>
+	<script type="text/javascript" src="https://cdn.bootcss.com/jquery/3.2.1/jquery.js"></script>
 </head>
 <body>
 	<!--{$name}-->
@@ -20,6 +21,9 @@
 	    	'onMenuShareTimeline',
 	    	'onMenuShareAppMessage',
 	    	'chooseImage',
+	    	'previewImage',
+	    	'uploadImage',
+	    	'downloadImage',
 	    	'scanQRCode',
 	    	'startRecord',
 	    	'stopRecord',
@@ -84,16 +88,73 @@
 	});
 
 	//拍照或从手机相册中选图接口
-	function show(){
+	function chooseImage(callback){
 		wx.chooseImage({
 		    count: 1, // 默认9
 		    sizeType: ['original', 'compressed'], // 可以指定是原图还是压缩图，默认二者都有
 		    sourceType: ['album', 'camera'], // 可以指定来源是相册还是相机，默认二者都有
 		    success: function (res) {
-		        var localIds = res.localIds; // 返回选定照片的本地ID列表，localId可以作为img标签的src属性显示图片
+		        localIds = res.localIds; // 返回选定照片的本地ID列表，localId可以作为img标签的src属性显示图片
+		        callback();
 		    }
 		});
 	}
+
+	//预览图片接口
+	function previewImage(){
+		wx.previewImage({
+		    current: 'http://www.wwfd.club/static/image/1503415637.png', // 当前显示图片的http链接
+		    urls: [
+		    	'http://www.wwfd.club/static/image/1503414081.png',
+		    	'http://www.wwfd.club/static/image/1503414386.png',
+		    	'http://www.wwfd.club/static/image/1503414389.png',
+		    	'http://www.wwfd.club/static/image/1503414454.png',
+		    ] // 需要预览的图片http链接列表
+		});
+	}
+
+	//上传图片接口
+	function uploadImage(){
+		//chooseImage();
+		wx.uploadImage({
+		    localId: localIds.toString(), // 需要上传的图片的本地ID，由chooseImage接口获得
+		    isShowProgressTips: 1, // 默认为1，显示进度提示
+		    success: function (res) {
+		        var serverId = res.serverId.toString(); // 返回图片的服务器端ID
+		        $.post('http://www.wwfd.club/index/wetest/setserverid',{'serverId':serverId},function(data){
+		        	if (data=='100') {
+		        		alert('上传成功!');
+		        	}else{
+		        		alert(data);
+		        	}
+		        });
+		    }
+		});			
+	}
+
+	function upload(uploadImage){
+
+	}
+
+	//下载图片接口
+	function downloadImage(){
+		chooseImage();
+		wx.uploadImage({
+		    localId: localIds.toString(), // 需要上传的图片的本地ID，由chooseImage接口获得
+		    isShowProgressTips: 1, // 默认为1，显示进度提示
+		    success: function (res) {
+		        serverId = res.serverId.toString(); // 返回图片的服务器端ID
+		    }
+		});	
+		wx.downloadImage({
+		    serverId: 'serverId', // 需要下载的图片的服务器端ID，由uploadImage接口获得
+		    isShowProgressTips: 1, // 默认为1，显示进度提示
+		    success: function (res) {
+		        var localId = res.localId; // 返回图片下载后的本地ID
+		    }
+		});
+	}
+
 
 	//扫一扫
 	function scan(){
@@ -138,14 +199,14 @@
 	//停止播放接口
 	function stopVoice(){
 		wx.stopVoice({
-		    localId: localId // 需要停止的音频的本地ID，由stopRecord接口获得
+		    localId: localId.toString() // 需要停止的音频的本地ID，由stopRecord接口获得
 		});
 	}
 
 	//上传语音接口
 	function uploadVoice(){
 		wx.uploadVoice({
-		    localId: '', // 需要上传的音频的本地ID，由stopRecord接口获得
+		    localId: localId.toString(), // 需要上传的音频的本地ID，由stopRecord接口获得
 		    isShowProgressTips: 1, // 默认为1，显示进度提示
 		        success: function (res) {
 		        var serverId = res.serverId; // 返回音频的服务器端ID
@@ -179,8 +240,10 @@
  
 	});
 	</script>
-	<button onclick='show();'>相册</button>	
-	<button onclick='scan();'>扫一扫</button><br>
+	<button onclick='previewImage();'>预览图片</button>
+	<button onclick='chooseImage(uploadImage);'>上传图片</button><br>	
+	<button onclick='downloadImage();'>下载图片</button>
+	<button onclick='scan();'>扫&nbsp;一&nbsp;&nbsp;扫</button><br>
 	<button onclick='startRecord();'>开始录音</button>
 	<button onclick='stopRecord();'>停止录音</button><br>
 	<button onclick='playVoice();'>播放录音</button>

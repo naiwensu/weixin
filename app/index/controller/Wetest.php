@@ -561,7 +561,12 @@ class Wetest extends Controller
                                     'name'=>urlencode('微信分享'),
                                     'type'=>'view',
                                     'url'=>'http://www.wwfd.club/index/wetest/shareWx',
-                                )//第三个二级菜单                               
+                                ),//第三个二级菜单 
+                                array(
+                                    'name'=>urlencode('mygithub'),
+                                    'type'=>'view',
+                                    'url'=>'https://github.com/naiwensu',
+                                )//第三个二级菜单                            
                             )
 
                     ),//第二个一级菜单
@@ -812,7 +817,7 @@ class Wetest extends Controller
         $jsapi_ticket = $this->getJsApiTicket();
         $timestamp = time();
         $nonceStr = $this->getRandCode();
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
 
         $url = "$protocol$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
         //$url = 'http://'.$_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF'].'?'.$_SERVER['QUERY_STRING'];
@@ -829,12 +834,141 @@ class Wetest extends Controller
         return $this->fetch('wetest/share');
     }
 
+    public function setServerId()
+    {
+        $serverId=input('post.serverId');
+        //$serverId='KiA8aNabWbQFWA8zbHRHN1A3AertMbj';
+        $createTime=time();
+        $data=['server_id'=>$serverId,'create_time'=>$createTime];
+        $res=db('serverid')->insert($data);
+        $access_token = $this->getWxAccessToken();
+        //$url = "https://api.weixin.qq.com/cgi-bin/media/upload?access_token=".$access_token."&type=image";
+        //$res = http_curl($url,'post','json','');
+        //$media_id = $res['media_id'];
+        $url="https://api.weixin.qq.com/cgi-bin/media/get?access_token=".$access_token."&media_id=".$serverId;
+        $arr = $this->getImage($url,'','',1);
+        //$arr=$this->file_content($url,'','');
+        if ($arr['error']=='7') {
+            echo '100';
+        }else{
+            echo $serverId;
+        }
+    }
 
+    public function file_content($url,$save_dir='',$filename='')
+    {
+		$url = 'https://api.weixin.qq.com/cgi-bin/media/get?access_token=ACCESS_TOKEN&media_id=MEDIA_ID'; 
+		// 这里获取到的，并不能预先知道是什么类型，如jpg,jpeg,png,gif
+		$curl = curl_init();
+		curl_setopt($curl, CURLOPT_URL, $url );
+		curl_setopt($curl, CURLOPT_HEADER, 0);
+		curl_setopt($curl, CURLOPT_TIMEOUT, 10);
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, FALSE);
+		curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, FALSE);
+		$response = curl_exec($curl);
+		$httpCode = curl_getinfo($curl,CURLINFO_HTTP_CODE);
+		$headerSize = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
+		curl_close($curl);
+		if (!empty($response) && 200==$httpCode) {
+		    $header = substr($response, 0, $headerSize);
+		    $body = substr($response, $headerSize);
+		    $headerArr = explode("\n", $header);
+		    foreach ($headerArr as $v) {
+		        header($v);
+		    }
+		    echo $body;
+		    exit;
+		}
+
+    }
+
+     /*
+    *功能：php完美实现下载远程图片并保存到本地
+    *参数：文件url,保存文件目录,保存文件名称，使用的下载方式
+    *当保存文件名称为空时则使用远程文件原来的名称
+    */
+    function getImage($url,$save_dir='',$filename='',$type=0){
+        if(trim($url)==''){
+            return array('file_name'=>'','save_path'=>'','error'=>1);
+        }
+        if(trim($save_dir)==''){
+            $save_dir='/home/wwwroot/default/weixin/public/static/image';
+        }
+        if(trim($filename)==''){//保存文件名
+            $ext=strrchr($url,'.');
+            /*if($ext!='.gif'&&$ext!='.jpg'&&$ext!='.jpeg'&&$ext!='.png'){
+            	//$ext='.png';
+                //return array('file_name'=>'','save_path'=>'','error'=>3);
+            }*/
+            $filename=time().$ext;
+        }
+        if(0!==strrpos($save_dir,'/')){
+            $save_dir.='/';
+        }
+        //创建保存目录
+        if(!file_exists($save_dir)&&!mkdir($save_dir,0777,true)){
+            return array('file_name'=>'','save_path'=>'','error'=>5);
+        }
+        //获取远程文件所采用的方法 
+        if($type){
+            $ch=curl_init();
+            $timeout=100;
+            curl_setopt($ch,CURLOPT_URL,$url);
+            curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
+            curl_setopt($ch,CURLOPT_CONNECTTIMEOUT,$timeout);
+            curl_setopt ($ch, CURLOPT_HEADER, 1);
+            $img=curl_exec($ch);
+            $content_type = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            curl_close($ch);
+        }else{
+            ob_start(); 
+            readfile($url);
+            $img=ob_get_contents(); 
+            ob_end_clean(); 
+        }
+        //$size=strlen($img);
+        //文件大小 
+        
+        $arr = explode('/',$content_type);
+        $filename = time().'.'.$arr['1'];
+        	$header = substr($img, 0, $headerSize);
+		    $body = substr($img, $headerSize);
+        $fp2=fopen($save_dir.$filename,'a');
+        //return array('file_name'=>$filename,'save_path'=>$save_dir.$filename,'error'=>2);
+        fwrite($fp2,$body);
+        //return array('file_name'=>'','save_path'=>'','error'=>3);
+        fclose($fp2);
+        //return array('file_name'=>'','save_path'=>'','error'=>4);
+        unset($body,$url);
+        return array('file_name'=>$filename,'save_path'=>$save_dir.$filename,'error'=>7);
+    }
+
+    //新增临时素材
+    public function add()
+    {
+		/* 新增一个临时素材 */
+		//url 里面的需要2个参数一个 access_token 一个是 type（值可为image、voice、video和缩略图thumb）
+		$access_token = $this->getWxAccessToken();
+		$url = "https://api.weixin.qq.com/cgi-bin/media/upload?access_token=".$access_token."&type=image";
+		if (class_exists('\CURLFile')) {
+			$data = array('media' => new \CURLFile(realpath("https://ss0.bdstatic.com/5aV1bjqh_Q23odCf/static/superman/img/logo/bd_logo1_31bdc765.png")));
+		} else {
+			$data = array('media' => '@' . realpath("https://ss0.bdstatic.com/5aV1bjqh_Q23odCf/static/superman/img/logo/bd_logo1_31bdc765.png"));
+		}
+		var_dump($data);
+		$res=$this->http_curl($url,'post','json',$data);
+		var_dump($res);
+    }
 
     public function show()
-    {
-        echo "string";
-    	return $this->fetch();
+    {	//Session::set('access_token','');
+        echo $access_token = $this->getWxAccessToken();
+        $url='https://api.weixin.qq.com/cgi-bin/media/get?access_token=7D4_Cck6Hpaqw6pWT_ME1k8m6P6sHoTcnfePKrZjroQzmwG1iBUI47zgw0A7D8CXBN-W3vPPzjiPkTM3t3RdnT38Wuz5nVcmwdszo4nFYeMWxXpQI0FPMgGkYYy6BbYBYRLfAJAPIC&media_id=36XKMQ92jI2l0taug6nL5_1bEG_upz2BMjonTbg78EkWMCumnonagWMxIQWiTG1P';
+        $arr=$this->getImage($url,'','',1);
+        //var_dump($arr);
+        //echo $arr['error'];
     }
 
 }
